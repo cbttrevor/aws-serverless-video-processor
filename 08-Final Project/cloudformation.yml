@@ -1,0 +1,276 @@
+Resources:
+  CloudTrailBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: cbt-trevor-cloudtrail-usw2
+  # In order to write CloudTrail logs to S3, you must delegate write access 
+  # to the CloudTrail service via an S3 Bucket Policy.
+  CloudTrailBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: cbt-trevor-cloudtrail-usw2
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AWSCloudTrailWrite
+            Effect: Allow
+            Action: s3:PutObject
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Resource: 'arn:aws:s3:::cbt-trevor-cloudtrail-usw2/AWSLogs/665453315198/*'
+            Condition:
+              StringEquals:
+                's3:x-amz-acl': bucket-owner-full-control
+          - Sid: AWSCloudTrailAclCheck
+            Action: 's3:GetBucketAcl'
+            Effect: Allow
+            Principal:
+              Service: 'cloudtrail.amazonaws.com'
+            Resource: 'arn:aws:s3:::cbt-trevor-cloudtrail-usw2'
+  CloudTrail:
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      TrailName: aws-serverless-video-processor
+      S3BucketName: cbt-trevor-cloudtrail-usw2
+      IsLogging: true
+      # IMPORTANT: You MUST include CloudTrail event selectors to record
+      # "data" (versus "management") events, such as S3 PutObject events
+      EventSelectors:
+        - DataResources:
+            - Type: AWS::S3::Object
+              Values:
+                - 'arn:aws:s3:::'
+          ReadWriteType: WriteOnly
+    DependsOn:
+      - CloudTrailBucketPolicy
+  SourceBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: cbt-video-sink
+  DestinationBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: cbt-video-processed
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+        - Name: videoprocessor
+          Image: 665453315198.dkr.ecr.us-west-2.amazonaws.com/videoprocessor
+          Cpu: 4096
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: videoprocessor
+              awslogs-region: us-west-2
+              awslogs-stream-prefix: powershell
+              awslogs-create-group: true
+          HealthCheck:
+            Command:
+              - pwsh
+              - -Command 
+              - Get-Process -Name ffmpeg
+      Cpu: '4096'
+      Memory: '8192'
+      ExecutionRoleArn: !Ref ExecutionRole
+      TaskRoleArn: !Ref TaskRole
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+  EventRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - events.amazonaws.com
+            Action:
+              - sts:AssumeRole
+  StateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+  S3Trigger:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Triggers an AWS Fargate task when a new S3 object is uploaded.
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - s3.amazonaws.com
+          eventName:
+            - PutObject
+          requestParameters:
+            bucketName:
+              - cbt-video-sink
+      Name: AWS-Serverless-Video-Processor-S3Trigger
+      RoleArn: !GetAtt EventRole.Arn
+      State: ENABLED
+      Targets: 
+        - Arn: !Ref StepFunction
+          RoleArn: !GetAtt EventRole.Arn
+          Id: invoke-video-processor-sfn
+        # - Arn: !GetAtt ECSCluster.Arn
+        #   RoleArn: !GetAtt EventRole.Arn
+        #   EcsParameters:
+        #     LaunchType: FARGATE
+        #     TaskDefinitionArn: !Ref TaskDefinition
+        #     NetworkConfiguration:
+        #       AwsVpcConfiguration:
+        #         AssignPublicIp: ENABLED
+        #         SecurityGroups:
+        #           - !Ref SecGroup
+        #         Subnets:
+        #           - !Ref Subnet
+        #   Id: invoke-video-processor
+  StepFunction:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: VideoProcessor
+      RoleArn: !GetAtt StateMachineRole.Arn
+      DefinitionString: !Sub
+        - |
+          {
+            "StartAt": "ConvertVideo",
+            "States": {
+              "ConvertVideo": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::ecs:runTask.sync",
+                "Parameters": {
+                  "LaunchType":"FARGATE",
+                  "Cluster": "${Cluster}",
+                  "TaskDefinition": "${TaskDefinition}",
+                  "Overrides": {
+                    "ContainerOverrides": [
+                      {
+                        "Name": "videoprocessor",
+                        "Environment": [
+                          {
+                            "Name": "S3Key",
+                            "Value.$": "$.detail.requestParameters.key"
+                          },
+                          {
+                            "Name": "S3Bucket",
+                            "Value.$": "$.detail.requestParameters.bucketName"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "NetworkConfiguration": {
+                    "AwsvpcConfiguration": {
+                      "AssignPublicIp": "ENABLED",
+                      "SecurityGroups": [
+                        "${SecurityGroup}"
+                      ],
+                      "Subnets": [
+                        "${Subnet}"
+                      ]
+                    }
+                  }
+                },
+                "End": true
+              }
+            }
+          }
+        - Cluster: !Ref ECSCluster
+          TaskDefinition: !Select [ 0, !Split [ ':', !Select [1, !Split [ '/', !Ref TaskDefinition ] ] ] ]
+          SecurityGroup: !Ref SecGroup
+          Subnet: !Ref Subnet
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: aws-serverless-video-processor
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.9.0.0/16
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.9.0.0/24
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: true
+  SecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Fargate Tasks
+      GroupName: FargateVideoProcessor
+      VpcId: !Ref VPC
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+  InternetRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet
+
+  
