@@ -1,12 +1,12 @@
 ## Objective
 
 Our serverless video processor needs a custom container image, with our application code embedded, to run the video processing task.
-In this section, we'll 
+In this section, we'll be defining the Task Definition that is used to launch tasks on the AWS Fargate service to perform video processing tasks. 
 
-For this solution, we'll be using a simple Step Function that only has a single task in it, which launches a Fargate task and waits for it to complete.
-The event data will come from S3, and will be routed directly into the Step Function.
+The Task Definition includes many parameters, such as the amount of CPU and memory to allocate to the task, and an array of containers that will be deployed inside the task (one or more). Additionally, there is a logging configuration section that allows you to specify where container logs should be emitted to.
 
 ## Learning Points
 
-* AWS Step Functions provides a powerful workflow framework
-* You can define AWS Step Functions as embedded JSON inside of an AWS CloudFormation template built using YAML
+* Task Definitions provide the parameters for launching tasks on Amazon ECS / AWS Fargate
+* You can define task definitions as YAML objects in AWS CloudFormation templates
+* The logging configuration can push logs directly to Amazon CloudWatch Logs

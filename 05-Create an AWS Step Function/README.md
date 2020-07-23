@@ -11,7 +11,7 @@ When the AWS Step Function receives an input event from Amazon EventBridge, it w
 You might recall, when we created our ECS Task Definition, we didn't specify any container environment variables.
 However, we can override this behavior and add in environment variables at task run time.
 
-AWS Step Functions are constructed using a simple JSON syntax called [Amazon States Language (ASL)]().
+AWS Step Functions are constructed using a simple JSON syntax called [Amazon States Language (ASL)](https://docs.aws.amazon.com/step-functions/latest/dg/concepts-amazon-states-language.html).
 
 Here's an example of a simple Step Function:
 
