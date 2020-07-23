@@ -5,9 +5,6 @@ Additionally, we will leverage the AWS Tools for PowerShell to perform automatio
 
 ## Prerequisites
 
-* Install [Microsoft Visual Studio Code](https://code.visualstudio.com/)
-* Install [PowerShell](https://github.com/PowerShell/PowerShell/)
-* Install [Python](https://python.org)
 * Learn about [setting up AWS credentials](https://docs.aws.amazon.com/powershell/latest/userguide/specifying-your-aws-credentials.html)
 * Learn to install and utilize the [AWS Tools for PowerShell](https://www.cbtnuggets.com/it-training/automate-aws-powershell-linux-mac-windows?utm_source=trainer&utm_medium=trainer&utm_campaign=trevor-sullivan)
 
@@ -20,12 +17,22 @@ Additionally, we will leverage the AWS Tools for PowerShell to perform automatio
 * Automated mining safety systems
 * Remote quality assurance in manufacturing
 
+## Software
+
+* Install [Microsoft Visual Studio Code](https://code.visualstudio.com/)
+* Install [PowerShell](https://github.com/PowerShell/PowerShell/)
+* Install [AWS Tools for PowerShell](https://aws.amazon.com/powershell/)
+* Install [Python](https://python.org)
+* Install [AWS Toolkit for VSCode](https://marketplace.visualstudio.com/items?itemName=AmazonWebServices.aws-toolkit-vscode)
+* Install [cfn-lint](https://github.com/aws-cloudformation/cfn-python-lint)
+
 ## Solution Architecture
 
 Writing an S3 object into a "source bucket" will trigger an Amazon EventBridge event rule, which obtains data events from AWS CloudTrail audit logs.
 The EventBridge rule will trigger an AWS Step Function, which kicks off an AWS Fargate task that contains the S3 bucket and S3 object key. 
 The AWS Fargate task will be a PowerShell application that kicks off `ffmpeg` to perform a video conversion task.
 Once the video conversion process is completed, the Fargate task will upload the converted file into a destination bucket.
+AWS Fargate tasks stream their logs into Amazon CloudWatch Logs, thanks to the `awslogs` logging driver.
 
 ## Learning Points
 
