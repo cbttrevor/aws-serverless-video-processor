@@ -153,6 +153,7 @@ Resources:
             - s3.amazonaws.com
           eventName:
             - PutObject
+            - CompleteMultipartUpload
           requestParameters:
             bucketName:
               - cbt-video-sink
