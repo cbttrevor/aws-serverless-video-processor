@@ -1,0 +1,1 @@
+Update-CFNStack -TemplateBody (Get-Content -Raw -Path $PSScriptRoot/cloudformation.yml) -StackName vpctest

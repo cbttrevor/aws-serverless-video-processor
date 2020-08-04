@@ -1,0 +1,87 @@
+Resources:
+  VPC1:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.19.0.0/16
+  Subnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC1
+      MapPublicIpOnLaunch: true
+      CidrBlock: 10.19.5.0/24
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC1
+  SecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Fargate Tasks
+      GroupName: FargateVideoProcessor
+      VpcId: !Ref VPC1
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC1
+  InternetRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet1
+  CloudTrail1:
+    DependsOn:
+      - CloudTrailBucketPolicy
+    Type: AWS::CloudTrail::Trail
+    Properties: 
+      EventSelectors: 
+        - ReadWriteType: WriteOnly
+          DataResources:
+            - Type: AWS::S3::Object
+              Values:
+                - 'arn:aws:s3:::cbtvideo-source/'
+      IsLogging: true
+      S3BucketName: cbtvideo-cloudtrail
+      TrailName: trevorcbt
+  CloudTrailBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: cbtvideo-cloudtrail
+  SourceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: cbtvideo-source
+  DestinationBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: cbtvideo-destination
+  CloudTrailBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: cbtvideo-cloudtrail
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AWSCloudTrailWrite
+            Effect: Allow
+            Action: s3:PutObject
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Resource: 'arn:aws:s3:::cbtvideo-cloudtrail/AWSLogs/665453315198/*'
+            Condition:
+              StringEquals:
+                's3:x-amz-acl': bucket-owner-full-control
+          - Sid: AWSCloudTrailAclCheck
+            Action: 's3:GetBucketAcl'
+            Effect: Allow
+            Principal:
+              Service: 'cloudtrail.amazonaws.com'
+            Resource: 'arn:aws:s3:::cbtvideo-cloudtrail'
