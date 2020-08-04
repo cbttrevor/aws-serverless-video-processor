@@ -1,6 +1,8 @@
 # NOTE: This PowerShell script is responsible for building a Docker container image
 #   for the video processor.
 
+Set-DefaultAWSRegion -Region us-west-2
+
 # Login to Amazon Elastic Container Registry
 Invoke-Expression -Command (Get-ECRloginCommand).Command
 
