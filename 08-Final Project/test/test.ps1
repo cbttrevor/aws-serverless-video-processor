@@ -1,0 +1,1 @@
+Write-S3Object -BucketName cbtvideo-source -File $HOME/Downloads/testfile.json
