@@ -2,6 +2,8 @@
 
 Perform video conversions using AWS Fargate, triggered by uploads to an Amazon S3 Bucket.
 
+![Architecture Diagram](https://raw.githubusercontent.com/cbttrevor/aws-serverless-video-processor/master/serverless-video-processor.svg)
+
 ## Dependencies
 
 * [PowerShell](https://github.com/powershell/powershell)
