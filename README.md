@@ -1,6 +1,6 @@
 ## Objective
 
-Perform video conversions using AWS Fargate, triggered by uploads to an Amazon S3 Bucket.
+Perform video conversions using AWS Fargate, triggered by uploads to an Amazon S3 Bucket. Check out the [video training content](https://bit.ly/cbt_serverless_video)!
 
 ![Architecture Diagram](https://raw.githubusercontent.com/cbttrevor/aws-serverless-video-processor/master/serverless-video-processor.svg)
 
